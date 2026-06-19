@@ -46,29 +46,49 @@ let currentDays = 14;
 // ===== 轮盘 =====
 async function loadToday() {
   const { decided, result } = await api('/api/decision/today');
-  if (decided) lockResult(result, false);
+  if (decided) {
+    showResultText(result);
+    wheelRotation = wheelAngleFor(result);
+    setRotation(wheelRotation, false); // 已决定：直接停在结果区，无动画
+  }
 }
 
 function resultText(r) { return r === 'lu' ? '撸 🔴' : '不撸 🟢'; }
 
-function lockResult(result, animate) {
+// 让对应结果的扇区中心停到顶部指针下：lu→右半(270°)，bulu→左半(90°)，带轻微抖动
+function wheelAngleFor(result) {
+  const center = result === 'lu' ? 270 : 90;
+  const jitter = Math.random() * 80 - 40; // ±40°，仍落在对应半区内
+  return center + jitter;
+}
+
+// 同时旋转色块和文字：文字作为轮盘子元素跟着转，再反向旋转以保持正向可读
+function setRotation(deg, animate) {
+  const wheel = document.getElementById('wheel');
+  const labels = document.querySelectorAll('.wheel-label');
+  if (!animate) {
+    wheel.style.transition = 'none';
+    labels.forEach((l) => (l.style.transition = 'none'));
+  }
+  wheel.style.transform = `rotate(${deg}deg)`;
+  labels.forEach((l) => (l.style.transform = `translate(-50%, -50%) rotate(${-deg}deg)`));
+  if (!animate) {
+    void wheel.offsetWidth; // 强制重排，避免恢复过渡时把瞬时定位也做成动画
+    requestAnimationFrame(() => {
+      wheel.style.transition = '';
+      labels.forEach((l) => (l.style.transition = ''));
+    });
+  }
+}
+
+function showResultText(result) {
   const big = document.getElementById('resultBig');
-  const btn = document.getElementById('spinBtn');
-  const hint = document.getElementById('spinHint');
   big.textContent = '今天：' + resultText(result);
   big.className = 'result-big ' + result;
+  const btn = document.getElementById('spinBtn');
   btn.disabled = true;
   btn.textContent = '今天已揭晓';
-  hint.textContent = '明天再来转一次吧～';
-
-  // 让轮盘停在对应区域（lu→右半，bulu→左半）
-  const target = result === 'lu' ? 270 : 90;
-  const jitter = (Math.random() * 100 - 50);
-  const wheel = document.getElementById('wheel');
-  if (!animate) wheel.style.transition = 'none';
-  wheelRotation += (animate ? 360 * 5 : 0) + ((target + jitter) - (wheelRotation % 360) + 360) % 360;
-  wheel.style.transform = `rotate(${wheelRotation}deg)`;
-  if (!animate) requestAnimationFrame(() => (wheel.style.transition = ''));
+  document.getElementById('spinHint').textContent = '明天再来转一次吧～';
 }
 
 async function spin() {
@@ -84,19 +104,20 @@ async function spin() {
   } catch (err) {
     // 可能今天已经转过（并发/多端）
     document.getElementById('spinHint').textContent = err.message;
+    btn.disabled = false;
     spinning = false;
     return;
   }
 
-  // 动画：先快转，再停在结果区
-  const target = data.result === 'lu' ? 270 : 90;
-  const jitter = Math.random() * 100 - 50;
-  const wheel = document.getElementById('wheel');
-  wheelRotation += 360 * 5 + ((target + jitter) - (wheelRotation % 360) + 360) % 360;
-  wheel.style.transform = `rotate(${wheelRotation}deg)`;
+  // 在当前角度上至少再转 5 整圈，精准停到结果扇区中心（一次性算好，避免收尾突跳）
+  const rest = wheelAngleFor(data.result);
+  const current = ((wheelRotation % 360) + 360) % 360;
+  const delta = (((rest - current) % 360) + 360) % 360;
+  wheelRotation += 360 * 5 + delta;
+  setRotation(wheelRotation, true);
 
   setTimeout(async () => {
-    lockResult(data.result, false);
+    showResultText(data.result);
     spinning = false;
     await loadStats(currentDays); // 刷新统计
   }, 4100);
