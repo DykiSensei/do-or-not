@@ -1,0 +1,25 @@
+{
+  "name": "do-or-not",
+  "version": "1.0.0",
+  "description": "撸还是不撸 —— 随机轮盘决策 + 统计 web 应用",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "node-cron": "^4.4.1",
+    "nodemailer": "^9.0.1"
+  }
+}

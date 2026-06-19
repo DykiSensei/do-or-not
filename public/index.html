@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>撸还是不撸</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- 顶栏 -->
+    <div class="topbar">
+      <div class="brand">撸还是<span>不撸</span> 🎰</div>
+      <div class="me">
+        <img class="avatar" id="meAvatar" src="" alt="" />
+        <span class="name" id="meName"></span>
+        <button class="linkbtn" id="settingsBtn">设置</button>
+        <button class="linkbtn" id="logoutBtn">退出</button>
+      </div>
+    </div>
+
+    <!-- 轮盘 -->
+    <div class="card roulette-card">
+      <h2 class="section-title" style="justify-content:center;">今天，撸还是不撸？</h2>
+      <div class="wheel-box">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel"></div>
+        <div class="wheel-label top">撸</div>
+        <div class="wheel-label bottom">不撸</div>
+      </div>
+      <div class="result-big" id="resultBig"></div>
+      <button class="btn" id="spinBtn" style="max-width:240px;margin-left:auto;margin-right:auto;">转动命运轮盘</button>
+      <p class="hint" id="spinHint">每天只能转一次，转完今天就定了</p>
+    </div>
+
+    <!-- 统计 -->
+    <div class="card">
+      <h2 class="section-title">📊 大家的战况</h2>
+      <div class="tabs" id="rangeTabs">
+        <span class="tab active" data-days="14">近 14 天</span>
+        <span class="tab" data-days="30">近 30 天</span>
+        <span class="tab" data-days="7">近 7 天</span>
+      </div>
+      <div class="legend">
+        <span><i class="dot lu"></i>撸</span>
+        <span><i class="dot bulu"></i>不撸</span>
+        <span><i class="dot"></i>未决定</span>
+      </div>
+
+      <div class="grid-wrap">
+        <table class="grid" id="gridTable"></table>
+      </div>
+
+      <h2 class="section-title" style="margin-top:28px;">🏆 撸率排行</h2>
+      <canvas id="ratioChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- 设置弹层 -->
+  <div class="modal-bg" id="modalBg">
+    <div class="card modal">
+      <h3>个人设置</h3>
+      <div class="avatar-edit">
+        <img id="editAvatar" src="" alt="" />
+        <div>
+          <input type="file" id="avatarFile" accept="image/*" style="display:none" />
+          <button class="btn secondary" id="pickAvatar" style="margin-top:0;width:auto;padding:8px 16px;">更换头像</button>
+          <div class="hint" style="margin-top:6px;">≤ 2MB，png/jpg/webp/gif</div>
+        </div>
+      </div>
+      <label for="editNickname">昵称</label>
+      <input type="text" id="editNickname" maxlength="20" />
+      <div class="msg" id="settingsMsg"></div>
+      <div class="row" style="margin-top:20px;">
+        <button class="btn secondary" id="closeModal">关闭</button>
+        <button class="btn" id="saveSettings">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

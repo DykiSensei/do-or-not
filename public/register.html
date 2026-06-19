@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>注册 · 撸还是不撸</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <h1>注册</h1>
+      <p class="sub">注册后需验证邮箱才能登录</p>
+
+      <form id="regForm">
+        <label for="nickname">昵称（显示在统计图上）</label>
+        <input type="text" id="nickname" maxlength="20" required />
+
+        <label for="email">邮箱</label>
+        <input type="email" id="email" autocomplete="email" required />
+
+        <label for="password">密码（至少 6 位）</label>
+        <input type="password" id="password" autocomplete="new-password" minlength="6" required />
+
+        <button class="btn" type="submit" id="submitBtn">注册并发送验证邮件</button>
+      </form>
+
+      <div class="msg" id="msg"></div>
+      <p class="switch">已有账号？<a href="/login.html">去登录</a></p>
+    </div>
+  </div>
+
+  <script src="/js/register.js"></script>
+</body>
+</html>
