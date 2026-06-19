@@ -29,6 +29,7 @@ let wheelRotation = 0;
 let spinning = false;
 let ratioChart = null;
 let currentDays = 14;
+let currentPostId = null;
 
 // ===== 初始化 =====
 (async function init() {
@@ -184,9 +185,10 @@ function renderGrid({ days, users }) {
       const res = r && r.result;
       const cls = res === 'lu' ? 'cell lu' : res === 'bulu' ? 'cell bulu' : 'cell';
       const modeTxt = r ? (r.mode === 'manual' ? '手动' : '轮盘') : '';
-      const title = `${d} · ${res ? (res === 'lu' ? '撸' : '不撸') + ' · ' + modeTxt : '未决定'}${r && r.photo ? ' · 已打卡' : ''}`;
+      const cmtTxt = r && r.comments ? ` · ${r.comments} 条评论` : '';
+      const title = `${d} · ${res ? (res === 'lu' ? '撸' : '不撸') + ' · ' + modeTxt : '未决定'}${r && r.photo ? ' · 已打卡' : ''}${cmtTxt}`;
       const cam = r && r.photo
-        ? `<span class="cam" data-photo="${escapeHtml(r.photo)}" data-cap="${escapeHtml(u.nickname + ' · ' + d)}" title="${title}">📷</span>`
+        ? `<span class="cam" data-id="${r.id}" data-photo="${escapeHtml(r.photo)}" data-cap="${escapeHtml(u.nickname + ' · ' + d + ' · ' + (res === 'lu' ? '撸' : '不撸'))}" title="${title}">📷${r.comments ? `<b class="cam-n">${r.comments}</b>` : ''}</span>`
         : '';
       body += `<td><span class="${cls}" title="${title}">${cam}</span></td>`;
     }
@@ -228,6 +230,84 @@ function escapeHtml(s) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ===== 打卡帖 + 评论 =====
+function fmtTime(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function openPost(id, photo, cap) {
+  currentPostId = id;
+  document.getElementById('photoBig').src = photo;
+  document.getElementById('photoCap').textContent = cap;
+  document.getElementById('commentMsg').className = 'msg';
+  document.getElementById('commentInput').value = '';
+  document.getElementById('commentList').innerHTML = '<div class="cmt-empty">加载中…</div>';
+  document.getElementById('photoModal').classList.add('show');
+  loadComments(id);
+}
+
+function closePost() {
+  document.getElementById('photoModal').classList.remove('show');
+  currentPostId = null;
+}
+
+async function loadComments(id) {
+  if (!id) return;
+  let data;
+  try {
+    data = await api('/api/comments/' + id);
+  } catch (err) {
+    document.getElementById('commentList').innerHTML =
+      `<div class="cmt-empty">加载失败：${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (id !== currentPostId) return; // 期间已切换/关闭
+  renderComments(data.comments);
+}
+
+function renderComments(list) {
+  const box = document.getElementById('commentList');
+  if (!list.length) {
+    box.innerHTML = '<div class="cmt-empty">还没有评论，来抢沙发 🛋️</div>';
+    return;
+  }
+  box.innerHTML = list.map((c) => {
+    const av = avatarUrl({ avatar: c.avatar, nickname: c.nickname });
+    const del = c.user_id === me.id
+      ? `<button class="cmt-del" data-id="${c.id}" title="删除">删除</button>` : '';
+    return `<div class="cmt">
+      <img class="cmt-av" src="${av}" alt="">
+      <div class="cmt-main">
+        <div class="cmt-head"><b>${escapeHtml(c.nickname)}</b><span>${fmtTime(c.created_at)}</span>${del}</div>
+        <div class="cmt-body">${escapeHtml(c.body)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendComment() {
+  const input = document.getElementById('commentInput');
+  const body = input.value.trim();
+  const msg = document.getElementById('commentMsg');
+  if (!body) return;
+  if (!currentPostId) return;
+  document.getElementById('commentSend').disabled = true;
+  try {
+    await api('/api/comments/' + currentPostId, { method: 'POST', body: JSON.stringify({ body }) });
+    input.value = '';
+    msg.className = 'msg';
+    await loadComments(currentPostId);
+    await loadStats(currentDays); // 更新网格评论数角标
+  } catch (err) {
+    msg.textContent = err.message; msg.className = 'msg show err';
+  } finally {
+    document.getElementById('commentSend').disabled = false;
+  }
+}
+
 // ===== UI 绑定 =====
 function bindUI() {
   document.getElementById('spinBtn').addEventListener('click', spin);
@@ -255,16 +335,36 @@ function bindUI() {
     e.target.value = ''; // 允许再次选同一文件
   });
 
-  // 点网格里的 📷 看打卡照片
+  // 点网格里的 📷 打开打卡帖（照片 + 评论）
   const photoModal = document.getElementById('photoModal');
   document.getElementById('gridTable').addEventListener('click', (e) => {
     const cam = e.target.closest('.cam');
     if (!cam) return;
-    document.getElementById('photoBig').src = cam.dataset.photo;
-    document.getElementById('photoCap').textContent = cam.dataset.cap;
-    photoModal.classList.add('show');
+    openPost(cam.dataset.id, cam.dataset.photo, cam.dataset.cap);
   });
-  photoModal.addEventListener('click', () => photoModal.classList.remove('show'));
+  // 只在点遮罩或关闭按钮时收起；帖子内部点击不关闭
+  photoModal.addEventListener('click', (e) => { if (e.target === photoModal) closePost(); });
+  document.getElementById('postClose').addEventListener('click', closePost);
+
+  // 发表评论
+  document.getElementById('commentSend').addEventListener('click', sendComment);
+  document.getElementById('commentInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendComment(); }
+  });
+  // 删除自己的评论（事件委托）
+  document.getElementById('commentList').addEventListener('click', async (e) => {
+    const del = e.target.closest('.cmt-del');
+    if (!del) return;
+    if (!confirm('删除这条评论？')) return;
+    try {
+      await api('/api/comments/' + del.dataset.id, { method: 'DELETE' });
+      await loadComments(currentPostId);
+      await loadStats(currentDays);
+    } catch (err) {
+      const msg = document.getElementById('commentMsg');
+      msg.textContent = err.message; msg.className = 'msg show err';
+    }
+  });
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await api('/api/auth/logout', { method: 'POST' });

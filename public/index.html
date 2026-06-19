@@ -99,11 +99,18 @@
     </div>
   </div>
 
-  <!-- 打卡照片查看 -->
+  <!-- 打卡帖：照片 + 评论 -->
   <div class="modal-bg" id="photoModal">
-    <div class="photo-view">
-      <img id="photoBig" src="" alt="打卡照片" />
-      <div class="photo-cap" id="photoCap"></div>
+    <div class="post">
+      <button class="post-close" id="postClose" title="关闭">✕</button>
+      <img id="photoBig" class="post-photo" src="" alt="打卡照片" />
+      <div class="post-cap" id="photoCap"></div>
+      <div class="comments" id="commentList"></div>
+      <div class="comment-form">
+        <input type="text" id="commentInput" maxlength="500" placeholder="写条评论…" autocomplete="off" />
+        <button class="btn" id="commentSend">发送</button>
+      </div>
+      <div class="msg" id="commentMsg"></div>
     </div>
   </div>
 

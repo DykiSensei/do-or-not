@@ -14,7 +14,15 @@ router.get('/overview', requireAuth, (req, res) => {
   const since = days[0];
 
   const users = db.prepare('SELECT id, nickname, avatar FROM users WHERE verified=1 ORDER BY id').all();
-  const rows = db.prepare('SELECT user_id, day, result, mode, photo FROM decisions WHERE day >= ?').all(since);
+  const rows = db.prepare('SELECT id, user_id, day, result, mode, photo FROM decisions WHERE day >= ?').all(since);
+
+  // 各条打卡的评论数
+  const counts = db.prepare(`
+    SELECT decision_id, COUNT(*) AS c FROM comments
+    WHERE decision_id IN (SELECT id FROM decisions WHERE day >= ?)
+    GROUP BY decision_id
+  `).all(since);
+  const countMap = new Map(counts.map((r) => [r.decision_id, r.c]));
 
   const byUser = new Map();
   for (const u of users) {
@@ -23,7 +31,13 @@ router.get('/overview', requireAuth, (req, res) => {
   for (const r of rows) {
     const u = byUser.get(r.user_id);
     if (!u) continue;
-    u.results[r.day] = { result: r.result, mode: r.mode, photo: r.photo };
+    u.results[r.day] = {
+      id: r.id,
+      result: r.result,
+      mode: r.mode,
+      photo: r.photo,
+      comments: countMap.get(r.id) || 0,
+    };
     u.total += 1;
     if (r.result === 'lu') u.luCount += 1;
   }

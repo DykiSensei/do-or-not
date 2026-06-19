@@ -36,6 +36,18 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_decisions_day ON decisions(day);
+
+  CREATE TABLE IF NOT EXISTS comments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    decision_id INTEGER NOT NULL,                -- 评论挂在哪条打卡(决定)下
+    user_id     INTEGER NOT NULL,                -- 谁评论的
+    body        TEXT    NOT NULL,
+    created_at  INTEGER NOT NULL,
+    FOREIGN KEY(decision_id) REFERENCES decisions(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_comments_decision ON comments(decision_id);
 `);
 
 // 迁移：给老库的 decisions 表补上 mode / photo 列（已部署的实例升级用）

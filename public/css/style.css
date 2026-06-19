@@ -150,9 +150,42 @@ table.grid .userc img { width: 22px; height: 22px; border-radius: 50%; vertical-
 }
 
 /* 网格里的打卡相机角标 */
-.cam { font-size: 11px; line-height: 1; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.cam { position: relative; font-size: 11px; line-height: 1; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+.cam-n {
+  position: absolute; top: -6px; right: -8px;
+  background: var(--accent); color: #fff; font-size: 9px; font-weight: 700;
+  min-width: 13px; height: 13px; line-height: 13px; padding: 0 3px; border-radius: 7px; text-align: center;
+}
 
-/* 打卡照片查看 */
-.photo-view { max-width: 90vw; max-height: 90vh; text-align: center; }
-.photo-view img { max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
-.photo-cap { color: var(--text); margin-top: 12px; font-size: 14px; }
+/* ===== 打卡帖（照片 + 评论）===== */
+.post {
+  width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+  background: var(--card); border: 1px solid #2a2740; border-radius: var(--radius);
+  padding: 18px; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+}
+.post-close {
+  position: absolute; top: 10px; right: 12px; z-index: 2;
+  background: rgba(0,0,0,.4); border: none; color: #fff; cursor: pointer;
+  width: 28px; height: 28px; border-radius: 50%; font-size: 14px; line-height: 1;
+}
+.post-close:hover { background: rgba(0,0,0,.7); }
+.post-photo {
+  width: 100%; max-height: 56vh; object-fit: contain;
+  border-radius: 12px; background: #000; display: block;
+}
+.post-cap { color: var(--text); font-size: 14px; margin: 12px 2px; font-weight: 600; }
+
+.comments { border-top: 1px solid #2a2740; padding-top: 12px; max-height: 30vh; overflow-y: auto; }
+.cmt-empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+.cmt { display: flex; gap: 10px; margin-bottom: 12px; }
+.cmt-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid #34304d; }
+.cmt-main { flex: 1; min-width: 0; }
+.cmt-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.cmt-head b { color: var(--text); font-size: 13px; }
+.cmt-del { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; }
+.cmt-del:hover { color: var(--danger); }
+.cmt-body { color: var(--text); font-size: 14px; margin-top: 2px; word-break: break-word; white-space: pre-wrap; }
+
+.comment-form { display: flex; gap: 8px; margin-top: 12px; }
+.comment-form input { flex: 1; }
+.comment-form .btn { margin-top: 0; width: auto; padding: 0 18px; flex: none; }
