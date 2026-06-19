@@ -28,6 +28,8 @@ db.exec(`
     user_id    INTEGER NOT NULL,
     day        TEXT    NOT NULL,                -- 本地日期 YYYY-MM-DD
     result     TEXT    NOT NULL,               -- 'lu' 撸 / 'bulu' 不撸
+    mode       TEXT    NOT NULL DEFAULT 'spin', -- 'spin' 轮盘随机 / 'manual' 手动选择
+    photo      TEXT,                            -- 打卡照片 /uploads/xxx，可为空
     created_at INTEGER NOT NULL,
     UNIQUE(user_id, day),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -35,5 +37,14 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_decisions_day ON decisions(day);
 `);
+
+// 迁移：给老库的 decisions 表补上 mode / photo 列（已部署的实例升级用）
+const decisionCols = db.prepare('PRAGMA table_info(decisions)').all().map((c) => c.name);
+if (!decisionCols.includes('mode')) {
+  db.exec("ALTER TABLE decisions ADD COLUMN mode TEXT NOT NULL DEFAULT 'spin'");
+}
+if (!decisionCols.includes('photo')) {
+  db.exec('ALTER TABLE decisions ADD COLUMN photo TEXT');
+}
 
 module.exports = db;

@@ -116,7 +116,7 @@ table.grid { border-collapse: collapse; font-size: 12px; }
 table.grid th, table.grid td { padding: 0; text-align: center; }
 table.grid .userc { text-align: left; padding-right: 12px; white-space: nowrap; position: sticky; left: 0; background: var(--card); }
 table.grid .userc img { width: 22px; height: 22px; border-radius: 50%; vertical-align: middle; margin-right: 6px; object-fit: cover; }
-.cell { width: 22px; height: 22px; border-radius: 5px; margin: 2px; display: inline-block; background: var(--card2); }
+.cell { width: 22px; height: 22px; border-radius: 5px; margin: 2px; display: inline-flex; align-items: center; justify-content: center; background: var(--card2); vertical-align: middle; }
 .cell.lu { background: var(--lu); } .cell.bulu { background: var(--bulu); }
 .daycol { color: var(--muted); font-size: 10px; writing-mode: vertical-rl; height: 46px; }
 .ratio { color: var(--muted); padding-left: 10px; white-space: nowrap; }
@@ -134,3 +134,25 @@ table.grid .userc img { width: 22px; height: 22px; border-radius: 50%; vertical-
 .avatar-edit img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid #34304d; }
 .row { display: flex; gap: 10px; }
 .row .btn { margin-top: 0; }
+
+/* ===== 手动选择 ===== */
+.manual { margin-top: 16px; }
+.manual-or { color: var(--muted); font-size: 13px; }
+.btn.lu { background: var(--lu); }
+.btn.bulu { background: var(--bulu); }
+
+/* ===== 打卡 ===== */
+.checkin { margin-top: 22px; padding-top: 18px; border-top: 1px solid #2a2740; }
+.checkin-title { font-weight: 700; margin-bottom: 10px; }
+.checkin-photo {
+  max-width: 240px; max-height: 240px; border-radius: 12px;
+  margin: 0 auto 10px; display: block; object-fit: cover; border: 1px solid #34304d;
+}
+
+/* 网格里的打卡相机角标 */
+.cam { font-size: 11px; line-height: 1; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
+
+/* 打卡照片查看 */
+.photo-view { max-width: 90vw; max-height: 90vh; text-align: center; }
+.photo-view img { max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.photo-cap { color: var(--text); margin-top: 12px; font-size: 14px; }

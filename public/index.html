@@ -32,7 +32,26 @@
       </div>
       <div class="result-big" id="resultBig"></div>
       <button class="btn" id="spinBtn" style="max-width:240px;margin-left:auto;margin-right:auto;">转动命运轮盘</button>
-      <p class="hint" id="spinHint">每天只能转一次，转完今天就定了</p>
+      <p class="hint" id="spinHint">每天只能决定一次，定了就锁住</p>
+
+      <!-- 手动选择：不想交给命运就自己定 -->
+      <div class="manual" id="manualBox">
+        <span class="manual-or">或者自己定</span>
+        <div class="row" style="max-width:300px;margin:8px auto 0;">
+          <button class="btn lu" id="chooseLu">我要撸</button>
+          <button class="btn bulu" id="chooseBulu">我不撸</button>
+        </div>
+      </div>
+
+      <!-- 打卡：决定之后上传一张照片留证 -->
+      <div class="checkin" id="checkinBox" style="display:none;">
+        <div class="checkin-title">📸 今日打卡</div>
+        <img class="checkin-photo" id="checkinPhoto" alt="" style="display:none;" />
+        <input type="file" id="photoFile" accept="image/*" style="display:none;" />
+        <button class="btn secondary" id="pickPhoto" style="max-width:240px;margin-left:auto;margin-right:auto;">上传打卡照片</button>
+        <div class="hint">≤ 4MB，png/jpg/webp/gif，可重新上传替换</div>
+        <div class="msg" id="checkinMsg"></div>
+      </div>
     </div>
 
     <!-- 统计 -->
@@ -77,6 +96,14 @@
         <button class="btn secondary" id="closeModal">关闭</button>
         <button class="btn" id="saveSettings">保存</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 打卡照片查看 -->
+  <div class="modal-bg" id="photoModal">
+    <div class="photo-view">
+      <img id="photoBig" src="" alt="打卡照片" />
+      <div class="photo-cap" id="photoCap"></div>
     </div>
   </div>
 

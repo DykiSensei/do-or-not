@@ -45,9 +45,10 @@ let currentDays = 14;
 
 // ===== 轮盘 =====
 async function loadToday() {
-  const { decided, result } = await api('/api/decision/today');
+  const { decided, result, photo } = await api('/api/decision/today');
   if (decided) {
     showResultText(result);
+    showCheckin(photo);
     wheelRotation = wheelAngleFor(result);
     setRotation(wheelRotation, false); // 已决定：直接停在结果区，无动画
   }
@@ -88,7 +89,44 @@ function showResultText(result) {
   const btn = document.getElementById('spinBtn');
   btn.disabled = true;
   btn.textContent = '今天已揭晓';
-  document.getElementById('spinHint').textContent = '明天再来转一次吧～';
+  document.getElementById('spinHint').textContent = '明天再来决定一次吧～';
+  // 决定后隐藏手动选择按钮
+  document.getElementById('manualBox').style.display = 'none';
+}
+
+// 决定之后展示打卡区；若已传过照片则回显
+function showCheckin(photo) {
+  document.getElementById('checkinBox').style.display = 'block';
+  const img = document.getElementById('checkinPhoto');
+  const pick = document.getElementById('pickPhoto');
+  if (photo) {
+    img.src = photo;
+    img.style.display = 'block';
+    pick.textContent = '重新上传打卡照片';
+  } else {
+    img.style.display = 'none';
+    pick.textContent = '上传打卡照片';
+  }
+}
+
+// 手动选择今天的结果
+async function choose(result) {
+  if (spinning) return;
+  document.getElementById('chooseLu').disabled = true;
+  document.getElementById('chooseBulu').disabled = true;
+  try {
+    await api('/api/decision/choose', { method: 'POST', body: JSON.stringify({ result }) });
+  } catch (err) {
+    document.getElementById('spinHint').textContent = err.message;
+    document.getElementById('chooseLu').disabled = false;
+    document.getElementById('chooseBulu').disabled = false;
+    return;
+  }
+  showResultText(result);
+  showCheckin(null);
+  wheelRotation = wheelAngleFor(result);
+  setRotation(wheelRotation, true); // 转过去停在所选结果上
+  await loadStats(currentDays);
 }
 
 async function spin() {
@@ -118,6 +156,7 @@ async function spin() {
 
   setTimeout(async () => {
     showResultText(data.result);
+    showCheckin(null);
     spinning = false;
     await loadStats(currentDays); // 刷新统计
   }, 4100);
@@ -141,10 +180,15 @@ function renderGrid({ days, users }) {
   for (const u of users) {
     body += `<tr><td class="userc"><img src="${avatarUrl(u)}" alt="">${escapeHtml(u.nickname)}</td>`;
     for (const d of days) {
-      const r = u.results[d];
-      const cls = r === 'lu' ? 'cell lu' : r === 'bulu' ? 'cell bulu' : 'cell';
-      const title = `${d} · ${r ? (r === 'lu' ? '撸' : '不撸') : '未决定'}`;
-      body += `<td><span class="${cls}" title="${title}"></span></td>`;
+      const r = u.results[d]; // { result, mode, photo } 或 undefined
+      const res = r && r.result;
+      const cls = res === 'lu' ? 'cell lu' : res === 'bulu' ? 'cell bulu' : 'cell';
+      const modeTxt = r ? (r.mode === 'manual' ? '手动' : '轮盘') : '';
+      const title = `${d} · ${res ? (res === 'lu' ? '撸' : '不撸') + ' · ' + modeTxt : '未决定'}${r && r.photo ? ' · 已打卡' : ''}`;
+      const cam = r && r.photo
+        ? `<span class="cam" data-photo="${escapeHtml(r.photo)}" data-cap="${escapeHtml(u.nickname + ' · ' + d)}" title="${title}">📷</span>`
+        : '';
+      body += `<td><span class="${cls}" title="${title}">${cam}</span></td>`;
     }
     const ratio = u.total ? Math.round((u.luCount / u.total) * 100) : 0;
     body += `<td class="ratio">${u.luCount}/${u.total} (${ratio}%)</td></tr>`;
@@ -187,6 +231,40 @@ function escapeHtml(s) {
 // ===== UI 绑定 =====
 function bindUI() {
   document.getElementById('spinBtn').addEventListener('click', spin);
+  document.getElementById('chooseLu').addEventListener('click', () => choose('lu'));
+  document.getElementById('chooseBulu').addEventListener('click', () => choose('bulu'));
+
+  // 打卡照片上传
+  document.getElementById('pickPhoto').addEventListener('click', () => document.getElementById('photoFile').click());
+  document.getElementById('photoFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('photo', file);
+    const msg = document.getElementById('checkinMsg');
+    try {
+      const res = await fetch('/api/decision/photo', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '上传失败');
+      showCheckin(data.photo);
+      msg.textContent = '打卡成功！'; msg.className = 'msg show ok';
+      await loadStats(currentDays);
+    } catch (err) {
+      msg.textContent = err.message; msg.className = 'msg show err';
+    }
+    e.target.value = ''; // 允许再次选同一文件
+  });
+
+  // 点网格里的 📷 看打卡照片
+  const photoModal = document.getElementById('photoModal');
+  document.getElementById('gridTable').addEventListener('click', (e) => {
+    const cam = e.target.closest('.cam');
+    if (!cam) return;
+    document.getElementById('photoBig').src = cam.dataset.photo;
+    document.getElementById('photoCap').textContent = cam.dataset.cap;
+    photoModal.classList.add('show');
+  });
+  photoModal.addEventListener('click', () => photoModal.classList.remove('show'));
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await api('/api/auth/logout', { method: 'POST' });
