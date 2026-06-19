@@ -47,6 +47,28 @@ sudo DOMAIN=lu.example.com \
 
 ---
 
+## 🔄 更新到最新版
+
+已经部署过、只想升级代码？在项目目录里跑：
+
+```bash
+bash update.sh
+```
+
+> ⚠️ 用**当初部署时的同一个用户**运行，**不要加 `sudo`、不要用 root**（pm2 进程归属那个用户）。
+
+脚本只做三件事，**绝不动你的任何配置**：
+
+1. `git pull` 拉取 GitHub 最新代码（快进合并）
+2. 仅当 `package.json` 有变化时才 `npm install --omit=dev` 装新依赖
+3. `pm2 restart do-or-not` 重启应用
+
+它**不会触碰**：`.env`、数据库 `data/`、头像 `public/uploads/`、Nginx 配置、HTTPS 证书。已是最新版会直接退出。
+
+> 提示：你对 `.env`、`data/`、`public/uploads/` 的改动都被 `.gitignore` 忽略，不会和 `git pull` 冲突，可放心更新。若你**手动改过**仓库里被追踪的源码，更新前先 `git stash`，更新后 `git stash pop`。
+
+---
+
 ## 🧪 本地开发
 
 ```bash
@@ -154,6 +176,7 @@ do-or-not/
 ├── server.js              # Express 入口（helmet / 路由 / 静态资源 / 错误处理）
 ├── ecosystem.config.js    # PM2 进程配置
 ├── deploy.sh              # 一键部署脚本
+├── update.sh              # 一键更新脚本（git pull + 重启，不动配置）
 ├── db/database.js         # SQLite 建表
 ├── routes/
 │   ├── auth.js            # 注册 / 验证 / 登录 / 登出
