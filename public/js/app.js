@@ -23,13 +23,27 @@ function defaultAvatar(name) {
 }
 function avatarUrl(u) { return u.avatar || defaultAvatar(u.nickname); }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmtTime(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function resultText(r) { return r === 'lu' ? '撸 🔴' : '不撸 🟢'; }
+
 // ===== 状态 =====
 let me = null;
 let wheelRotation = 0;
 let spinning = false;
 let ratioChart = null;
 let currentDays = 14;
-let currentPostId = null;
+let pendingPhoto = null;           // 待发布的配图文件
+const feedPosts = new Map();        // id -> post，便于局部刷新评论
+let feedCursor = 0;                 // 已加载的最小帖子 id
+let feedLoading = false;
 
 // ===== 初始化 =====
 (async function init() {
@@ -40,22 +54,21 @@ let currentPostId = null;
   document.getElementById('meAvatar').src = avatarUrl(me);
 
   await loadToday();
+  await loadFeed(true);
   await loadStats(currentDays);
   bindUI();
 })();
 
-// ===== 轮盘 =====
+// ===== 轮盘 / 决定 =====
 async function loadToday() {
-  const { decided, result, photo } = await api('/api/decision/today');
+  const { decided, result, photo, note } = await api('/api/decision/today');
   if (decided) {
     showResultText(result);
-    showCheckin(photo);
+    showCheckin(photo, note);
     wheelRotation = wheelAngleFor(result);
     setRotation(wheelRotation, false); // 已决定：直接停在结果区，无动画
   }
 }
-
-function resultText(r) { return r === 'lu' ? '撸 🔴' : '不撸 🟢'; }
 
 // 让对应结果的扇区中心停到顶部指针下：lu→右半(270°)，bulu→左半(90°)，带轻微抖动
 function wheelAngleFor(result) {
@@ -91,26 +104,19 @@ function showResultText(result) {
   btn.disabled = true;
   btn.textContent = '今天已揭晓';
   document.getElementById('spinHint').textContent = '明天再来决定一次吧～';
-  // 决定后隐藏手动选择按钮
   document.getElementById('manualBox').style.display = 'none';
 }
 
-// 决定之后展示打卡区；若已传过照片则回显
-function showCheckin(photo) {
+// 决定之后展示打卡输入区，并回显已有的文字 / 配图
+function showCheckin(photo, note) {
   document.getElementById('checkinBox').style.display = 'block';
+  document.getElementById('noteInput').value = note || '';
+  pendingPhoto = null;
   const img = document.getElementById('checkinPhoto');
-  const pick = document.getElementById('pickPhoto');
-  if (photo) {
-    img.src = photo;
-    img.style.display = 'block';
-    pick.textContent = '重新上传打卡照片';
-  } else {
-    img.style.display = 'none';
-    pick.textContent = '上传打卡照片';
-  }
+  if (photo) { img.src = photo; img.style.display = 'block'; }
+  else { img.removeAttribute('src'); img.style.display = 'none'; }
 }
 
-// 手动选择今天的结果
 async function choose(result) {
   if (spinning) return;
   document.getElementById('chooseLu').disabled = true;
@@ -124,9 +130,10 @@ async function choose(result) {
     return;
   }
   showResultText(result);
-  showCheckin(null);
+  showCheckin(null, null);
   wheelRotation = wheelAngleFor(result);
-  setRotation(wheelRotation, true); // 转过去停在所选结果上
+  setRotation(wheelRotation, true);
+  await loadFeed(true);
   await loadStats(currentDays);
 }
 
@@ -141,7 +148,6 @@ async function spin() {
   try {
     data = await api('/api/decision/spin', { method: 'POST' });
   } catch (err) {
-    // 可能今天已经转过（并发/多端）
     document.getElementById('spinHint').textContent = err.message;
     btn.disabled = false;
     spinning = false;
@@ -157,10 +163,142 @@ async function spin() {
 
   setTimeout(async () => {
     showResultText(data.result);
-    showCheckin(null);
+    showCheckin(null, null);
     spinning = false;
-    await loadStats(currentDays); // 刷新统计
+    await loadFeed(true);
+    await loadStats(currentDays);
   }, 4100);
+}
+
+// 发布今日打卡（文字 + 可选配图）
+async function publishCheckin() {
+  const btn = document.getElementById('publishCheckin');
+  const msg = document.getElementById('checkinMsg');
+  const note = document.getElementById('noteInput').value.trim();
+  if (!note && !pendingPhoto && document.getElementById('checkinPhoto').style.display === 'none') {
+    msg.textContent = '写点文字或配张图再发布吧'; msg.className = 'msg show err';
+    return;
+  }
+  const fd = new FormData();
+  fd.append('note', note);
+  if (pendingPhoto) fd.append('photo', pendingPhoto);
+
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/decision/checkin', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '发布失败');
+    pendingPhoto = null;
+    const img = document.getElementById('checkinPhoto');
+    if (data.photo) { img.src = data.photo; img.style.display = 'block'; }
+    msg.textContent = '已发布到动态！'; msg.className = 'msg show ok';
+    await loadFeed(true);
+    await loadStats(currentDays);
+  } catch (err) {
+    msg.textContent = err.message; msg.className = 'msg show err';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===== 信息流 =====
+async function loadFeed(reset) {
+  if (feedLoading) return;
+  feedLoading = true;
+  if (reset) { feedCursor = 0; feedPosts.clear(); document.getElementById('feed').innerHTML = ''; }
+  let data;
+  try {
+    data = await api('/api/feed?limit=20' + (feedCursor ? '&before=' + feedCursor : ''));
+  } catch { feedLoading = false; return; }
+
+  const feed = document.getElementById('feed');
+  for (const p of data.posts) {
+    feedPosts.set(p.id, p);
+    feed.insertAdjacentHTML('beforeend', postHtml(p));
+    feedCursor = p.id; // 倒序，最后一条即最小 id
+  }
+  if (reset && data.posts.length === 0) {
+    feed.innerHTML = '<div class="cmt-empty">还没有人打卡，快去转个轮盘吧 🎰</div>';
+  }
+  document.getElementById('loadMore').style.display = data.hasMore ? 'block' : 'none';
+  document.getElementById('feedEnd').style.display =
+    (!data.hasMore && feedPosts.size > 0) ? 'block' : 'none';
+  feedLoading = false;
+}
+
+function postHtml(p) {
+  const av = avatarUrl(p.user);
+  const badge = `<span class="badge ${p.result}">${p.result === 'lu' ? '撸' : '不撸'}</span>`;
+  const modeTxt = p.mode === 'manual' ? '手动' : '轮盘';
+  const note = p.note ? `<div class="post-note">${escapeHtml(p.note)}</div>` : '';
+  const photo = p.photo
+    ? `<img class="post-img" src="${escapeHtml(p.photo)}" alt="打卡照片" data-photo="${escapeHtml(p.photo)}">` : '';
+  return `<div class="post-card" data-id="${p.id}">
+    <div class="post-top">
+      <img class="post-av" src="${av}" alt="">
+      <div class="post-meta">
+        <div class="post-name">${escapeHtml(p.user.nickname)} ${badge}</div>
+        <div class="post-time">${fmtTime(p.created_at)} · ${modeTxt}决定</div>
+      </div>
+    </div>
+    ${note}${photo}
+    <div class="post-cmts">${commentsHtml(p.comments)}</div>
+    <div class="comment-form">
+      <input class="cmt-in" type="text" maxlength="500" placeholder="写条评论…" autocomplete="off">
+      <button class="btn cmt-send">发送</button>
+    </div>
+  </div>`;
+}
+
+function commentsHtml(list) {
+  if (!list.length) return '';
+  return list.map((c) => {
+    const av = avatarUrl({ avatar: c.avatar, nickname: c.nickname });
+    const del = c.user_id === me.id
+      ? `<button class="cmt-del" data-id="${c.id}" title="删除">删除</button>` : '';
+    return `<div class="cmt">
+      <img class="cmt-av" src="${av}" alt="">
+      <div class="cmt-main">
+        <div class="cmt-head"><b>${escapeHtml(c.nickname)}</b><span>${fmtTime(c.created_at)}</span>${del}</div>
+        <div class="cmt-body">${escapeHtml(c.body)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function refreshPostComments(postId) {
+  const card = document.querySelector(`.post-card[data-id="${postId}"]`);
+  if (!card) return;
+  card.querySelector('.post-cmts').innerHTML = commentsHtml(feedPosts.get(postId).comments);
+}
+
+async function addComment(postId, inputEl) {
+  const body = inputEl.value.trim();
+  if (!body) return;
+  inputEl.disabled = true;
+  try {
+    const data = await api('/api/comments/' + postId, { method: 'POST', body: JSON.stringify({ body }) });
+    const post = feedPosts.get(postId);
+    if (post) { post.comments.push(data.comment); refreshPostComments(postId); }
+    inputEl.value = '';
+    await loadStats(currentDays); // 更新网格评论数角标
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    inputEl.disabled = false;
+    inputEl.focus();
+  }
+}
+
+async function deleteComment(postId, commentId) {
+  try {
+    await api('/api/comments/' + commentId, { method: 'DELETE' });
+    const post = feedPosts.get(postId);
+    if (post) { post.comments = post.comments.filter((c) => c.id !== commentId); refreshPostComments(postId); }
+    await loadStats(currentDays);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 // ===== 统计 =====
@@ -172,7 +310,6 @@ async function loadStats(days) {
 
 function renderGrid({ days, users }) {
   const table = document.getElementById('gridTable');
-  // 表头：日期（只显示月-日）
   let head = '<tr><th class="userc"></th>';
   for (const d of days) head += `<th class="daycol">${d.slice(5)}</th>`;
   head += '<th></th></tr>';
@@ -181,14 +318,14 @@ function renderGrid({ days, users }) {
   for (const u of users) {
     body += `<tr><td class="userc"><img src="${avatarUrl(u)}" alt="">${escapeHtml(u.nickname)}</td>`;
     for (const d of days) {
-      const r = u.results[d]; // { result, mode, photo } 或 undefined
+      const r = u.results[d]; // { id, result, mode, photo, comments } 或 undefined
       const res = r && r.result;
       const cls = res === 'lu' ? 'cell lu' : res === 'bulu' ? 'cell bulu' : 'cell';
       const modeTxt = r ? (r.mode === 'manual' ? '手动' : '轮盘') : '';
       const cmtTxt = r && r.comments ? ` · ${r.comments} 条评论` : '';
-      const title = `${d} · ${res ? (res === 'lu' ? '撸' : '不撸') + ' · ' + modeTxt : '未决定'}${r && r.photo ? ' · 已打卡' : ''}${cmtTxt}`;
+      const title = `${d} · ${res ? (res === 'lu' ? '撸' : '不撸') + ' · ' + modeTxt : '未决定'}${r && r.photo ? ' · 有图' : ''}${cmtTxt}`;
       const cam = r && r.photo
-        ? `<span class="cam" data-id="${r.id}" data-photo="${escapeHtml(r.photo)}" data-cap="${escapeHtml(u.nickname + ' · ' + d + ' · ' + (res === 'lu' ? '撸' : '不撸'))}" title="${title}">📷${r.comments ? `<b class="cam-n">${r.comments}</b>` : ''}</span>`
+        ? `<span class="cam" data-photo="${escapeHtml(r.photo)}" title="${title}">📷${r.comments ? `<b class="cam-n">${r.comments}</b>` : ''}</span>`
         : '';
       body += `<td><span class="${cls}" title="${title}">${cam}</span></td>`;
     }
@@ -225,87 +362,10 @@ function renderChart({ users }) {
   });
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-// ===== 打卡帖 + 评论 =====
-function fmtTime(ts) {
-  const d = new Date(ts);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-function openPost(id, photo, cap) {
-  currentPostId = id;
-  document.getElementById('photoBig').src = photo;
-  document.getElementById('photoCap').textContent = cap;
-  document.getElementById('commentMsg').className = 'msg';
-  document.getElementById('commentInput').value = '';
-  document.getElementById('commentList').innerHTML = '<div class="cmt-empty">加载中…</div>';
+// ===== 看大图 =====
+function openImage(src) {
+  document.getElementById('photoBig').src = src;
   document.getElementById('photoModal').classList.add('show');
-  loadComments(id);
-}
-
-function closePost() {
-  document.getElementById('photoModal').classList.remove('show');
-  currentPostId = null;
-}
-
-async function loadComments(id) {
-  if (!id) return;
-  let data;
-  try {
-    data = await api('/api/comments/' + id);
-  } catch (err) {
-    document.getElementById('commentList').innerHTML =
-      `<div class="cmt-empty">加载失败：${escapeHtml(err.message)}</div>`;
-    return;
-  }
-  if (id !== currentPostId) return; // 期间已切换/关闭
-  renderComments(data.comments);
-}
-
-function renderComments(list) {
-  const box = document.getElementById('commentList');
-  if (!list.length) {
-    box.innerHTML = '<div class="cmt-empty">还没有评论，来抢沙发 🛋️</div>';
-    return;
-  }
-  box.innerHTML = list.map((c) => {
-    const av = avatarUrl({ avatar: c.avatar, nickname: c.nickname });
-    const del = c.user_id === me.id
-      ? `<button class="cmt-del" data-id="${c.id}" title="删除">删除</button>` : '';
-    return `<div class="cmt">
-      <img class="cmt-av" src="${av}" alt="">
-      <div class="cmt-main">
-        <div class="cmt-head"><b>${escapeHtml(c.nickname)}</b><span>${fmtTime(c.created_at)}</span>${del}</div>
-        <div class="cmt-body">${escapeHtml(c.body)}</div>
-      </div>
-    </div>`;
-  }).join('');
-  box.scrollTop = box.scrollHeight;
-}
-
-async function sendComment() {
-  const input = document.getElementById('commentInput');
-  const body = input.value.trim();
-  const msg = document.getElementById('commentMsg');
-  if (!body) return;
-  if (!currentPostId) return;
-  document.getElementById('commentSend').disabled = true;
-  try {
-    await api('/api/comments/' + currentPostId, { method: 'POST', body: JSON.stringify({ body }) });
-    input.value = '';
-    msg.className = 'msg';
-    await loadComments(currentPostId);
-    await loadStats(currentDays); // 更新网格评论数角标
-  } catch (err) {
-    msg.textContent = err.message; msg.className = 'msg show err';
-  } finally {
-    document.getElementById('commentSend').disabled = false;
-  }
 }
 
 // ===== UI 绑定 =====
@@ -314,57 +374,56 @@ function bindUI() {
   document.getElementById('chooseLu').addEventListener('click', () => choose('lu'));
   document.getElementById('chooseBulu').addEventListener('click', () => choose('bulu'));
 
-  // 打卡照片上传
+  // 打卡：选配图 + 发布
   document.getElementById('pickPhoto').addEventListener('click', () => document.getElementById('photoFile').click());
-  document.getElementById('photoFile').addEventListener('change', async (e) => {
+  document.getElementById('photoFile').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append('photo', file);
-    const msg = document.getElementById('checkinMsg');
-    try {
-      const res = await fetch('/api/decision/photo', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '上传失败');
-      showCheckin(data.photo);
-      msg.textContent = '打卡成功！'; msg.className = 'msg show ok';
-      await loadStats(currentDays);
-    } catch (err) {
-      msg.textContent = err.message; msg.className = 'msg show err';
+    pendingPhoto = file;
+    const img = document.getElementById('checkinPhoto');
+    img.src = URL.createObjectURL(file);
+    img.style.display = 'block';
+    e.target.value = '';
+  });
+  document.getElementById('publishCheckin').addEventListener('click', publishCheckin);
+
+  // 信息流加载更多
+  document.getElementById('loadMore').addEventListener('click', () => loadFeed(false));
+
+  // 信息流内的交互（事件委托）
+  const feed = document.getElementById('feed');
+  feed.addEventListener('click', (e) => {
+    const img = e.target.closest('.post-img');
+    if (img) { openImage(img.dataset.photo); return; }
+
+    const send = e.target.closest('.cmt-send');
+    if (send) {
+      const card = send.closest('.post-card');
+      addComment(parseInt(card.dataset.id, 10), card.querySelector('.cmt-in'));
+      return;
     }
-    e.target.value = ''; // 允许再次选同一文件
+    const del = e.target.closest('.cmt-del');
+    if (del) {
+      const card = del.closest('.post-card');
+      if (confirm('删除这条评论？')) deleteComment(parseInt(card.dataset.id, 10), parseInt(del.dataset.id, 10));
+    }
+  });
+  feed.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const input = e.target.closest('.cmt-in');
+    if (!input) return;
+    e.preventDefault();
+    const card = input.closest('.post-card');
+    addComment(parseInt(card.dataset.id, 10), input);
   });
 
-  // 点网格里的 📷 打开打卡帖（照片 + 评论）
-  const photoModal = document.getElementById('photoModal');
+  // 看大图：网格 📷 与遮罩
   document.getElementById('gridTable').addEventListener('click', (e) => {
     const cam = e.target.closest('.cam');
-    if (!cam) return;
-    openPost(cam.dataset.id, cam.dataset.photo, cam.dataset.cap);
+    if (cam) openImage(cam.dataset.photo);
   });
-  // 只在点遮罩或关闭按钮时收起；帖子内部点击不关闭
-  photoModal.addEventListener('click', (e) => { if (e.target === photoModal) closePost(); });
-  document.getElementById('postClose').addEventListener('click', closePost);
-
-  // 发表评论
-  document.getElementById('commentSend').addEventListener('click', sendComment);
-  document.getElementById('commentInput').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); sendComment(); }
-  });
-  // 删除自己的评论（事件委托）
-  document.getElementById('commentList').addEventListener('click', async (e) => {
-    const del = e.target.closest('.cmt-del');
-    if (!del) return;
-    if (!confirm('删除这条评论？')) return;
-    try {
-      await api('/api/comments/' + del.dataset.id, { method: 'DELETE' });
-      await loadComments(currentPostId);
-      await loadStats(currentDays);
-    } catch (err) {
-      const msg = document.getElementById('commentMsg');
-      msg.textContent = err.message; msg.className = 'msg show err';
-    }
-  });
+  const photoModal = document.getElementById('photoModal');
+  photoModal.addEventListener('click', () => photoModal.classList.remove('show'));
 
   document.getElementById('logoutBtn').addEventListener('click', async () => {
     await api('/api/auth/logout', { method: 'POST' });
@@ -408,6 +467,7 @@ function bindUI() {
       document.getElementById('editAvatar').src = data.avatar;
       document.getElementById('meAvatar').src = data.avatar;
       msg.textContent = '头像已更新'; msg.className = 'msg show ok';
+      await loadFeed(true);
       await loadStats(currentDays);
     } catch (err) {
       msg.textContent = err.message; msg.className = 'msg show err';
@@ -424,6 +484,7 @@ function bindUI() {
       document.getElementById('meName').textContent = data.nickname;
       if (!me.avatar) document.getElementById('meAvatar').src = avatarUrl(me);
       msg.textContent = '已保存'; msg.className = 'msg show ok';
+      await loadFeed(true);
       await loadStats(currentDays);
     } catch (err) {
       msg.textContent = err.message; msg.className = 'msg show err';

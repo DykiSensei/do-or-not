@@ -58,5 +58,8 @@ if (!decisionCols.includes('mode')) {
 if (!decisionCols.includes('photo')) {
   db.exec('ALTER TABLE decisions ADD COLUMN photo TEXT');
 }
+if (!decisionCols.includes('note')) {
+  db.exec('ALTER TABLE decisions ADD COLUMN note TEXT'); // 打卡留言（可纯文字打卡）
+}
 
 module.exports = db;

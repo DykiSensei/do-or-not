@@ -141,13 +141,20 @@ table.grid .userc img { width: 22px; height: 22px; border-radius: 50%; vertical-
 .btn.lu { background: var(--lu); }
 .btn.bulu { background: var(--bulu); }
 
-/* ===== 打卡 ===== */
-.checkin { margin-top: 22px; padding-top: 18px; border-top: 1px solid #2a2740; }
+/* ===== 打卡输入区 ===== */
+.checkin { margin-top: 22px; padding-top: 18px; border-top: 1px solid #2a2740; text-align: left; }
 .checkin-title { font-weight: 700; margin-bottom: 10px; }
-.checkin-photo {
-  max-width: 240px; max-height: 240px; border-radius: 12px;
-  margin: 0 auto 10px; display: block; object-fit: cover; border: 1px solid #34304d;
+textarea#noteInput {
+  width: 100%; padding: 11px 13px; border-radius: 10px; resize: vertical;
+  border: 1px solid #34304d; background: var(--card2); color: var(--text);
+  font: inherit; font-size: 15px;
 }
+textarea#noteInput:focus { outline: none; border-color: var(--accent); }
+.checkin-photo {
+  max-width: 100%; max-height: 240px; border-radius: 12px;
+  margin: 12px 0 0; display: block; object-fit: cover; border: 1px solid #34304d;
+}
+.checkin .row .btn { margin-top: 0; }
 
 /* 网格里的打卡相机角标 */
 .cam { position: relative; font-size: 11px; line-height: 1; cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0,0,0,.5)); }
@@ -157,35 +164,36 @@ table.grid .userc img { width: 22px; height: 22px; border-radius: 50%; vertical-
   min-width: 13px; height: 13px; line-height: 13px; padding: 0 3px; border-radius: 7px; text-align: center;
 }
 
-/* ===== 打卡帖（照片 + 评论）===== */
-.post {
-  width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
-  background: var(--card); border: 1px solid #2a2740; border-radius: var(--radius);
-  padding: 18px; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.5);
-}
-.post-close {
-  position: absolute; top: 10px; right: 12px; z-index: 2;
-  background: rgba(0,0,0,.4); border: none; color: #fff; cursor: pointer;
-  width: 28px; height: 28px; border-radius: 50%; font-size: 14px; line-height: 1;
-}
-.post-close:hover { background: rgba(0,0,0,.7); }
-.post-photo {
-  width: 100%; max-height: 56vh; object-fit: contain;
-  border-radius: 12px; background: #000; display: block;
-}
-.post-cap { color: var(--text); font-size: 14px; margin: 12px 2px; font-weight: 600; }
+/* ===== 信息流 ===== */
+.feed { display: flex; flex-direction: column; gap: 14px; }
+.post-card { background: var(--card2); border: 1px solid #2a2740; border-radius: 12px; padding: 14px 16px; }
+.post-top { display: flex; align-items: center; gap: 10px; }
+.post-av { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #34304d; flex: none; }
+.post-meta { min-width: 0; }
+.post-name { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.post-time { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.badge { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; }
+.badge.lu { background: var(--lu); } .badge.bulu { background: var(--bulu); }
+.post-note { margin: 12px 2px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.post-img { margin-top: 12px; max-width: 100%; max-height: 60vh; border-radius: 12px; cursor: zoom-in; display: block; }
 
-.comments { border-top: 1px solid #2a2740; padding-top: 12px; max-height: 30vh; overflow-y: auto; }
-.cmt-empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
-.cmt { display: flex; gap: 10px; margin-bottom: 12px; }
-.cmt-av { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid #34304d; }
+.post-cmts { margin-top: 12px; }
+.post-cmts:empty { margin-top: 0; }
+.post-cmts .cmt:last-child { margin-bottom: 0; }
+.cmt { display: flex; gap: 10px; margin-bottom: 10px; }
+.cmt-av { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: none; border: 1px solid #34304d; }
 .cmt-main { flex: 1; min-width: 0; }
 .cmt-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .cmt-head b { color: var(--text); font-size: 13px; }
 .cmt-del { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; }
 .cmt-del:hover { color: var(--danger); }
 .cmt-body { color: var(--text); font-size: 14px; margin-top: 2px; word-break: break-word; white-space: pre-wrap; }
+.cmt-empty { color: var(--muted); font-size: 13px; padding: 8px 2px; text-align: center; }
 
-.comment-form { display: flex; gap: 8px; margin-top: 12px; }
-.comment-form input { flex: 1; }
-.comment-form .btn { margin-top: 0; width: auto; padding: 0 18px; flex: none; }
+.comment-form { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2740; }
+.comment-form .cmt-in { flex: 1; padding: 9px 12px; border-radius: 9px; border: 1px solid #34304d; background: var(--card); color: var(--text); font-size: 14px; }
+.comment-form .cmt-in:focus { outline: none; border-color: var(--accent); }
+.comment-form .btn { margin-top: 0; width: auto; padding: 0 16px; flex: none; }
+
+/* 看大图 */
+.lightbox-img { max-width: 92vw; max-height: 92vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }

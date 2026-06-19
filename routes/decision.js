@@ -33,7 +33,7 @@ const upload = multer({
 // 今天是否已决定
 router.get('/today', requireAuth, (req, res) => {
   const day = today();
-  const row = db.prepare('SELECT result, mode, photo, created_at FROM decisions WHERE user_id=? AND day=?')
+  const row = db.prepare('SELECT result, mode, photo, note, created_at FROM decisions WHERE user_id=? AND day=?')
     .get(req.user.id, day);
   res.json({
     day,
@@ -41,6 +41,7 @@ router.get('/today', requireAuth, (req, res) => {
     result: row ? row.result : null,
     mode: row ? row.mode : null,
     photo: row ? row.photo : null,
+    note: row ? row.note : null,
   });
 });
 
@@ -70,13 +71,12 @@ router.post('/choose', requireAuth, (req, res) => {
   decide(req, res, result, 'manual');
 });
 
-// 打卡：给今天的决定上传/替换一张照片（需先决定）
-router.post('/photo', requireAuth, (req, res) => {
+// 打卡：给今天的决定写文字 / 传照片（二者皆可选，可纯文字、可纯图、可都有；需先决定）
+router.post('/checkin', requireAuth, (req, res) => {
   upload.single('photo')(req, res, (err) => {
     if (err) return res.status(400).json({ error: err.message });
-    if (!req.file) return res.status(400).json({ error: '未收到图片' });
 
-    const cleanup = () => fs.existsSync(req.file.path) && fs.unlink(req.file.path, () => {});
+    const cleanup = () => req.file && fs.existsSync(req.file.path) && fs.unlink(req.file.path, () => {});
 
     const day = today();
     const row = db.prepare('SELECT id, photo FROM decisions WHERE user_id=? AND day=?').get(req.user.id, day);
@@ -85,15 +85,24 @@ router.post('/photo', requireAuth, (req, res) => {
       return res.status(409).json({ error: '请先决定今天撸还是不撸，再来打卡' });
     }
 
-    // 删掉旧打卡照片
-    if (row.photo && row.photo.startsWith('/uploads/')) {
-      const oldPath = path.join(uploadDir, path.basename(row.photo));
-      fs.existsSync(oldPath) && fs.unlink(oldPath, () => {});
+    const note = (req.body?.note || '').trim();
+    if (note.length > 1000) {
+      cleanup();
+      return res.status(400).json({ error: '打卡文字不超过 1000 字' });
     }
 
-    const url = `/uploads/${req.file.filename}`;
-    db.prepare('UPDATE decisions SET photo=? WHERE id=?').run(url, row.id);
-    res.json({ ok: true, photo: url });
+    let photoUrl = row.photo;
+    if (req.file) {
+      // 传了新图：删掉旧打卡照片
+      if (row.photo && row.photo.startsWith('/uploads/')) {
+        const oldPath = path.join(uploadDir, path.basename(row.photo));
+        fs.existsSync(oldPath) && fs.unlink(oldPath, () => {});
+      }
+      photoUrl = `/uploads/${req.file.filename}`;
+    }
+
+    db.prepare('UPDATE decisions SET note=?, photo=? WHERE id=?').run(note || null, photoUrl, row.id);
+    res.json({ ok: true, note: note || null, photo: photoUrl });
   });
 });
 

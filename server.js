@@ -46,6 +46,7 @@ app.use('/api/decision', require('./routes/decision'));
 app.use('/api/stats', require('./routes/stats'));
 app.use('/api/user', require('./routes/user'));
 app.use('/api/comments', require('./routes/comments'));
+app.use('/api/feed', require('./routes/feed'));
 
 // 静态资源（前端 + 上传的头像）
 app.use(express.static(path.join(__dirname, 'public')));

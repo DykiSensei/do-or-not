@@ -43,15 +43,27 @@
         </div>
       </div>
 
-      <!-- 打卡：决定之后上传一张照片留证 -->
+      <!-- 打卡：决定之后写两句 / 配张图（都可选，可纯文字打卡） -->
       <div class="checkin" id="checkinBox" style="display:none;">
-        <div class="checkin-title">📸 今日打卡</div>
+        <div class="checkin-title">📝 今日打卡</div>
+        <textarea id="noteInput" maxlength="1000" rows="3" placeholder="说点什么…（可纯文字打卡，也可以不写）"></textarea>
         <img class="checkin-photo" id="checkinPhoto" alt="" style="display:none;" />
         <input type="file" id="photoFile" accept="image/*" style="display:none;" />
-        <button class="btn secondary" id="pickPhoto" style="max-width:240px;margin-left:auto;margin-right:auto;">上传打卡照片</button>
-        <div class="hint">≤ 4MB，png/jpg/webp/gif，可重新上传替换</div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn secondary" id="pickPhoto">＋ 配图</button>
+          <button class="btn" id="publishCheckin">发布打卡</button>
+        </div>
+        <div class="hint">配图 ≤ 4MB，png/jpg/webp/gif，可重新发布替换</div>
         <div class="msg" id="checkinMsg"></div>
       </div>
+    </div>
+
+    <!-- 信息流 -->
+    <div class="card">
+      <h2 class="section-title">🧵 大家的动态</h2>
+      <div class="feed" id="feed"></div>
+      <button class="btn secondary" id="loadMore" style="display:none;">加载更多</button>
+      <div class="hint" id="feedEnd" style="display:none;text-align:center;">—— 到底啦 ——</div>
     </div>
 
     <!-- 统计 -->
@@ -99,19 +111,9 @@
     </div>
   </div>
 
-  <!-- 打卡帖：照片 + 评论 -->
+  <!-- 看大图 -->
   <div class="modal-bg" id="photoModal">
-    <div class="post">
-      <button class="post-close" id="postClose" title="关闭">✕</button>
-      <img id="photoBig" class="post-photo" src="" alt="打卡照片" />
-      <div class="post-cap" id="photoCap"></div>
-      <div class="comments" id="commentList"></div>
-      <div class="comment-form">
-        <input type="text" id="commentInput" maxlength="500" placeholder="写条评论…" autocomplete="off" />
-        <button class="btn" id="commentSend">发送</button>
-      </div>
-      <div class="msg" id="commentMsg"></div>
-    </div>
+    <img id="photoBig" class="lightbox-img" src="" alt="打卡照片" />
   </div>
 
   <script src="/js/bg.js"></script>
