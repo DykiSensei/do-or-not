@@ -25,8 +25,9 @@ app.use(helmet({
       scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
       // 页面里有 style="" 内联样式，需放行内联样式（仅样式，风险低）
       styleSrc: ["'self'", "'unsafe-inline'"],
-      // 默认头像是 data: SVG
-      imgSrc: ["'self'", 'data:'],
+      // 默认头像是 data: SVG；二次元背景图来自 alcy.cc 图床
+      // 注意：t.alcy.cc 会 302 跳到 tc.alcy.cc 等子域取图，故用通配子域放行
+      imgSrc: ["'self'", 'data:', 'https://*.alcy.cc'],
       connectSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
