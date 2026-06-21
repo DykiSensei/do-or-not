@@ -6,7 +6,8 @@ const multer = require('multer');
 
 const db = require('../db/database');
 const { requireAuth } = require('../middleware/auth');
-const { today } = require('../utils/day');
+const { today, DEFAULT_TZ } = require('../utils/day');
+const { lookupIp } = require('../services/geo');
 
 const router = express.Router();
 
@@ -30,9 +31,10 @@ const upload = multer({
   },
 });
 
-// 今天是否已决定
+// 今天是否已决定。「今天」按该用户保存的时区算
 router.get('/today', requireAuth, (req, res) => {
-  const day = today();
+  const u = db.prepare('SELECT timezone FROM users WHERE id=?').get(req.user.id);
+  const day = today(u?.timezone || DEFAULT_TZ);
   const row = db.prepare('SELECT result, mode, photo, note, created_at FROM decisions WHERE user_id=? AND day=?')
     .get(req.user.id, day);
   res.json({
@@ -45,30 +47,37 @@ router.get('/today', requireAuth, (req, res) => {
   });
 });
 
-// 写入今天的决定（轮盘随机 or 手动选择共用），一天只能一次
-function decide(req, res, result, mode) {
-  const day = today();
+// 写入今天的决定（轮盘随机 or 手动选择共用），一天只能一次。
+// 顺手查 IP 拿时区+地区：记到该条决定，同时把用户当前时区刷新到 users 表（提醒用）
+async function decide(req, res, result, mode) {
+  const geo = await lookupIp(req.ip);
+  const tz = geo.timezone || db.prepare('SELECT timezone FROM users WHERE id=?').get(req.user.id)?.timezone || DEFAULT_TZ;
+  const day = today(tz);
+
   const existing = db.prepare('SELECT result FROM decisions WHERE user_id=? AND day=?').get(req.user.id, day);
   if (existing) {
     return res.status(409).json({ error: '今天已经决定过啦', result: existing.result });
   }
-  db.prepare('INSERT INTO decisions (user_id, day, result, mode, created_at) VALUES (?,?,?,?,?)')
-    .run(req.user.id, day, result, mode, Date.now());
-  res.json({ ok: true, day, result, mode });
+  db.prepare('INSERT INTO decisions (user_id, day, result, mode, location, timezone, created_at) VALUES (?,?,?,?,?,?,?)')
+    .run(req.user.id, day, result, mode, geo.label, tz, Date.now());
+  if (geo.timezone) {
+    db.prepare('UPDATE users SET timezone=? WHERE id=?').run(geo.timezone, req.user.id);
+  }
+  res.json({ ok: true, day, result, mode, location: geo.label });
 }
 
 // 转轮盘：随机产生今天的结果
-router.post('/spin', requireAuth, (req, res) => {
-  decide(req, res, Math.random() < 0.5 ? 'lu' : 'bulu', 'spin');
+router.post('/spin', requireAuth, (req, res, next) => {
+  decide(req, res, Math.random() < 0.5 ? 'lu' : 'bulu', 'spin').catch(next);
 });
 
 // 手动选择今天的结果
-router.post('/choose', requireAuth, (req, res) => {
+router.post('/choose', requireAuth, (req, res, next) => {
   const result = req.body?.result;
   if (result !== 'lu' && result !== 'bulu') {
     return res.status(400).json({ error: '参数错误：result 只能是 lu 或 bulu' });
   }
-  decide(req, res, result, 'manual');
+  decide(req, res, result, 'manual').catch(next);
 });
 
 // 打卡：给今天的决定写文字 / 传照片（二者皆可选，可纯文字、可纯图、可都有；需先决定）
@@ -78,7 +87,8 @@ router.post('/checkin', requireAuth, (req, res) => {
 
     const cleanup = () => req.file && fs.existsSync(req.file.path) && fs.unlink(req.file.path, () => {});
 
-    const day = today();
+    const u = db.prepare('SELECT timezone FROM users WHERE id=?').get(req.user.id);
+    const day = today(u?.timezone || DEFAULT_TZ);
     const row = db.prepare('SELECT id, photo FROM decisions WHERE user_id=? AND day=?').get(req.user.id, day);
     if (!row) {
       cleanup(); // 还没决定就别留下孤儿文件

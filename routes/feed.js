@@ -12,13 +12,13 @@ router.get('/', requireAuth, (req, res) => {
 
   const posts = (before > 0
     ? db.prepare(`
-        SELECT d.id, d.day, d.result, d.mode, d.photo, d.note, d.created_at,
+        SELECT d.id, d.day, d.result, d.mode, d.photo, d.note, d.location, d.created_at,
                u.id AS user_id, u.nickname, u.avatar
         FROM decisions d JOIN users u ON u.id = d.user_id
         WHERE d.id < ?
         ORDER BY d.id DESC LIMIT ?`).all(before, limit)
     : db.prepare(`
-        SELECT d.id, d.day, d.result, d.mode, d.photo, d.note, d.created_at,
+        SELECT d.id, d.day, d.result, d.mode, d.photo, d.note, d.location, d.created_at,
                u.id AS user_id, u.nickname, u.avatar
         FROM decisions d JOIN users u ON u.id = d.user_id
         ORDER BY d.id DESC LIMIT ?`).all(limit));
@@ -51,6 +51,7 @@ router.get('/', requireAuth, (req, res) => {
     mode: p.mode,
     photo: p.photo,
     note: p.note,
+    location: p.location,
     created_at: p.created_at,
     user: { id: p.user_id, nickname: p.nickname, avatar: p.avatar },
     comments: byPost.get(p.id) || [],

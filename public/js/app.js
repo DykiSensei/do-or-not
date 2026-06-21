@@ -272,14 +272,15 @@ function postHtml(p) {
   const photo = p.photo
     ? `<img class="post-img" src="${escapeHtml(p.photo)}" alt="打卡照片" data-photo="${escapeHtml(p.photo)}">` : '';
   const body = (note || photo)
-    ? `<div class="post-body collapsible">${note}${photo}</div><button class="post-expand" type="button">展开</button>`
+    ? `<div class="post-body">${note}${photo}</div><button class="post-expand" type="button">展开</button>`
     : '';
+  const loc = p.location ? ` · 📍 ${escapeHtml(p.location)}` : '';
   return `<div class="post-card" data-id="${p.id}">
     <div class="post-top">
       <img class="post-av" src="${av}" alt="">
       <div class="post-meta">
         <div class="post-name">${escapeHtml(p.user.nickname)} ${badge}</div>
-        <div class="post-time">${fmtTime(p.created_at)} · ${modeTxt}决定</div>
+        <div class="post-time">${fmtTime(p.created_at)} · ${modeTxt}决定${loc}</div>
       </div>
     </div>
     ${body}
@@ -291,18 +292,23 @@ function postHtml(p) {
   </div>`;
 }
 
-// 文字 + 图任一超过折叠高度就显示「展开」。图片是异步加载的，load 后再量一次
+// 量帖子体积，决定是否显示「展开」+ 底部渐变。
+// 用 ResizeObserver 兜底：图片异步加载、被折叠的帖子展开后变可见、窗口缩放，都会触发重新量
 function maybeCollapsePostBody(card) {
-  const body = card.querySelector('.post-body.collapsible');
+  const body = card.querySelector('.post-body');
   if (!body) return;
   const btn = card.querySelector('.post-expand');
   const check = () => {
     if (body.classList.contains('expanded')) return;
-    if (body.scrollHeight > body.clientHeight + 1) btn.classList.add('show');
+    // 元素被 display:none 隐藏时 scrollHeight = 0，跳过避免错判为不溢出
+    if (body.clientHeight === 0) return;
+    const overflow = body.scrollHeight > body.clientHeight + 1;
+    body.classList.toggle('has-more', overflow);
+    btn.classList.toggle('show', overflow);
   };
   check();
-  const img = body.querySelector('.post-img');
-  if (img && !img.complete) img.addEventListener('load', check, { once: true });
+  // 注意：post-card 始终在 DOM 里，ResizeObserver 在元素从 display:none 变可见时也会触发一次
+  new ResizeObserver(check).observe(body);
 }
 
 // 按线程渲染：顶层评论后紧跟它的所有后代回复（扁平 + 缩进 + @ 前缀指明回复对象）

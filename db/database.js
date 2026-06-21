@@ -69,4 +69,16 @@ if (!commentCols.includes('parent_id')) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)');
 }
 
+// 时区/地区：用户表存最近一次时区供提醒用；决定表存每条打卡当时的时区与地区，前端显示
+const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+if (!userCols.includes('timezone')) {
+  db.exec('ALTER TABLE users ADD COLUMN timezone TEXT'); // IANA 名，如 'Asia/Shanghai'
+}
+if (!decisionCols.includes('location')) {
+  db.exec('ALTER TABLE decisions ADD COLUMN location TEXT'); // 显示用，例：'中国 · 上海'
+}
+if (!decisionCols.includes('timezone')) {
+  db.exec('ALTER TABLE decisions ADD COLUMN timezone TEXT'); // 记录该条决定使用的时区
+}
+
 module.exports = db;
