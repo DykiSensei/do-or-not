@@ -42,16 +42,15 @@ function schedule() {
     console.error(`[reminder] REMINDER_CRON 表达式无效：${raw}，已回退到默认 ${DEFAULT_CRON}`);
   }
   const expr = valid ? raw : DEFAULT_CRON;
-  // REMINDER_TZ 可显式指定时区（如 'Asia/Shanghai'），避免服务器是 UTC 时悄悄漂时间
-  const timezone = process.env.REMINDER_TZ || undefined;
+  // 默认 Asia/Shanghai：服务器时区常是 UTC，按本地时间排程会差 8 小时。其他地区可用 REMINDER_TZ 覆盖
+  const timezone = process.env.REMINDER_TZ || 'Asia/Shanghai';
 
   const task = cron.schedule(expr, () => {
     runReminder().catch((e) => console.error('[reminder] 执行出错：', e));
-  }, timezone ? { timezone } : undefined);
+  }, { timezone });
 
   const next = task.getNextRun();
-  const tzNote = timezone ? ` TZ=${timezone}` : ` (服务器本地时区，建议设 REMINDER_TZ)`;
-  console.log(`[reminder] 已排程 cron='${expr}'${tzNote}，下次触发：${next ? next.toISOString() : '未知'}`);
+  console.log(`[reminder] 已排程 cron='${expr}' TZ=${timezone}，下次触发：${next ? next.toISOString() : '未知'}`);
 }
 
 module.exports = { schedule, runReminder };

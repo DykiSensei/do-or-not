@@ -69,7 +69,7 @@ bash update.sh
 | `SMTP_USER` / `SMTP_PASS` | Gmail 地址 + 应用专用密码（16 位，不是登录密码） |
 | `MAIL_FROM_NAME` | 发件人显示名 |
 | `REMINDER_CRON` | 每日提醒的 cron 表达式，默认 `0 21 * * *` |
-| `REMINDER_TZ` | 提醒时区（IANA 名，如 `Asia/Shanghai`）。不填用服务器本地时区——云主机常默认 UTC，**强烈建议显式指定** |
+| `REMINDER_TZ` | 提醒时区（IANA 名），默认 `Asia/Shanghai`。非中国用户改成自己的时区 |
 
 Gmail 应用专用密码：[Google 账号](https://myaccount.google.com/security) → 安全性 → 开两步验证 → 应用专用密码。用其他邮箱服务商把 `services/mailer.js` 里的 `service: 'gmail'` 换成对应 `host` / `port` / `secure` 即可。
 
