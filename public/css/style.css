@@ -166,6 +166,7 @@ textarea#noteInput:focus { outline: none; border-color: var(--accent); }
 
 /* ===== 信息流 ===== */
 .feed { display: flex; flex-direction: column; gap: 14px; }
+.feed.collapsed > .post-card:nth-child(n+4) { display: none; }
 .post-card { background: var(--card2); border: 1px solid #2a2740; border-radius: 12px; padding: 14px 16px; }
 .post-top { display: flex; align-items: center; gap: 10px; }
 .post-av { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #34304d; flex: none; }

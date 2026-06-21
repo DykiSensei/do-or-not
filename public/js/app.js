@@ -44,6 +44,9 @@ let pendingPhoto = null;           // 待发布的配图文件
 const feedPosts = new Map();        // id -> post，便于局部刷新评论
 let feedCursor = 0;                 // 已加载的最小帖子 id
 let feedLoading = false;
+let feedCollapsed = true;           // 默认折叠：只显示最近 FEED_VISIBLE 条
+let feedHasMore = false;
+const FEED_VISIBLE = 3;
 
 // ===== 初始化 =====
 (async function init() {
@@ -221,10 +224,44 @@ async function loadFeed(reset) {
   if (reset && data.posts.length === 0) {
     feed.innerHTML = '<div class="cmt-empty">还没有人打卡，快去转个轮盘吧 🎰</div>';
   }
-  document.getElementById('loadMore').style.display = data.hasMore ? 'block' : 'none';
-  document.getElementById('feedEnd').style.display =
-    (!data.hasMore && feedPosts.size > 0) ? 'block' : 'none';
+  feedHasMore = data.hasMore;
+  updateFeedView();
   feedLoading = false;
+}
+
+// 控制整个 feed 卡片的折叠 / 加载更多 / 到底提示，按 feedCollapsed 与已加载数量决定显示
+function updateFeedView() {
+  const feed = document.getElementById('feed');
+  const toggle = document.getElementById('feedToggle');
+  const loadMore = document.getElementById('loadMore');
+  const feedEnd = document.getElementById('feedEnd');
+  const total = feedPosts.size;
+
+  if (total === 0) {
+    feed.classList.remove('collapsed');
+    toggle.style.display = 'none';
+    loadMore.style.display = 'none';
+    feedEnd.style.display = 'none';
+    return;
+  }
+
+  // 已加载 + 还能再翻的，都算「可展开的」总量
+  const expandable = total > FEED_VISIBLE || feedHasMore;
+
+  if (feedCollapsed && expandable) {
+    feed.classList.add('collapsed');
+    toggle.style.display = 'block';
+    const hidden = Math.max(total - FEED_VISIBLE, 0);
+    toggle.textContent = hidden > 0 ? `展开剩余 ${hidden} 条动态` : '展开全部动态';
+    loadMore.style.display = 'none';
+    feedEnd.style.display = 'none';
+  } else {
+    feed.classList.remove('collapsed');
+    toggle.style.display = expandable ? 'block' : 'none';
+    toggle.textContent = '收起动态';
+    loadMore.style.display = feedHasMore ? 'block' : 'none';
+    feedEnd.style.display = (!feedHasMore && total > 0) ? 'block' : 'none';
+  }
 }
 
 function postHtml(p) {
@@ -400,6 +437,12 @@ function bindUI() {
 
   // 信息流加载更多
   document.getElementById('loadMore').addEventListener('click', () => loadFeed(false));
+
+  // 信息流整体折叠 / 展开
+  document.getElementById('feedToggle').addEventListener('click', () => {
+    feedCollapsed = !feedCollapsed;
+    updateFeedView();
+  });
 
   // 信息流内的交互（事件委托）
   const feed = document.getElementById('feed');
