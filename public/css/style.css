@@ -175,6 +175,19 @@ textarea#noteInput:focus { outline: none; border-color: var(--accent); }
 .badge { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; }
 .badge.lu { background: var(--lu); } .badge.bulu { background: var(--bulu); }
 .post-note { margin: 12px 2px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+.post-note.collapsible { max-height: 9em; overflow: hidden; position: relative; }
+.post-note.collapsible.expanded { max-height: none; }
+.post-note.collapsible:not(.expanded)::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.4em;
+  background: linear-gradient(180deg, rgba(35,32,50,0), var(--card2));
+  pointer-events: none;
+}
+.post-expand {
+  display: none; margin: 4px 2px 0; padding: 2px 0;
+  background: none; border: none; color: var(--accent2); font-size: 13px; cursor: pointer;
+}
+.post-expand.show { display: inline-block; }
+.post-expand:hover { text-decoration: underline; }
 .post-img { margin-top: 12px; max-width: 100%; max-height: 60vh; border-radius: 12px; cursor: zoom-in; display: block; }
 
 .post-cmts { margin-top: 12px; }

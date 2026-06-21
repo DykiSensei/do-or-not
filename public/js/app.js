@@ -215,6 +215,7 @@ async function loadFeed(reset) {
   for (const p of data.posts) {
     feedPosts.set(p.id, p);
     feed.insertAdjacentHTML('beforeend', postHtml(p));
+    maybeCollapseNote(feed.lastElementChild);
     feedCursor = p.id; // 倒序，最后一条即最小 id
   }
   if (reset && data.posts.length === 0) {
@@ -230,7 +231,9 @@ function postHtml(p) {
   const av = avatarUrl(p.user);
   const badge = `<span class="badge ${p.result}">${p.result === 'lu' ? '撸' : '不撸'}</span>`;
   const modeTxt = p.mode === 'manual' ? '手动' : '轮盘';
-  const note = p.note ? `<div class="post-note">${escapeHtml(p.note)}</div>` : '';
+  const note = p.note
+    ? `<div class="post-note collapsible">${escapeHtml(p.note)}</div><button class="post-expand" type="button">展开</button>`
+    : '';
   const photo = p.photo
     ? `<img class="post-img" src="${escapeHtml(p.photo)}" alt="打卡照片" data-photo="${escapeHtml(p.photo)}">` : '';
   return `<div class="post-card" data-id="${p.id}">
@@ -248,6 +251,14 @@ function postHtml(p) {
       <button class="btn cmt-send">发送</button>
     </div>
   </div>`;
+}
+
+// 文字超过折叠高度才显示「展开」按钮；插入后量一次即可
+function maybeCollapseNote(card) {
+  const note = card.querySelector('.post-note.collapsible');
+  if (!note) return;
+  const btn = card.querySelector('.post-expand');
+  if (note.scrollHeight > note.clientHeight + 1) btn.classList.add('show');
 }
 
 function commentsHtml(list) {
@@ -395,6 +406,14 @@ function bindUI() {
   feed.addEventListener('click', (e) => {
     const img = e.target.closest('.post-img');
     if (img) { openImage(img.dataset.photo); return; }
+
+    const expand = e.target.closest('.post-expand');
+    if (expand) {
+      const note = expand.previousElementSibling; // .post-note.collapsible
+      const expanded = note.classList.toggle('expanded');
+      expand.textContent = expanded ? '收起' : '展开';
+      return;
+    }
 
     const send = e.target.closest('.cmt-send');
     if (send) {
