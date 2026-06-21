@@ -176,15 +176,17 @@ textarea#noteInput:focus { outline: none; border-color: var(--accent); }
 .badge { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; }
 .badge.lu { background: var(--lu); } .badge.bulu { background: var(--bulu); }
 .post-note { margin: 12px 2px 0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
-.post-note.collapsible { max-height: 9em; overflow: hidden; position: relative; }
-.post-note.collapsible.expanded { max-height: none; }
-.post-note.collapsible:not(.expanded)::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.4em;
+
+/* 长帖（文字 + 图）整体折叠：文字 + 图任一过长都裁到 max-height，渐变蒙层提示「还有更多」 */
+.post-body.collapsible { max-height: 300px; overflow: hidden; position: relative; }
+.post-body.collapsible.expanded { max-height: none; }
+.post-body.collapsible:not(.expanded)::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3em;
   background: linear-gradient(180deg, rgba(35,32,50,0), var(--card2));
   pointer-events: none;
 }
 .post-expand {
-  display: none; margin: 4px 2px 0; padding: 2px 0;
+  display: none; margin: 6px 2px 0; padding: 2px 0;
   background: none; border: none; color: var(--accent2); font-size: 13px; cursor: pointer;
 }
 .post-expand.show { display: inline-block; }
@@ -199,10 +201,30 @@ textarea#noteInput:focus { outline: none; border-color: var(--accent); }
 .cmt-main { flex: 1; min-width: 0; }
 .cmt-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
 .cmt-head b { color: var(--text); font-size: 13px; }
-.cmt-del { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; }
+.cmt-reply-btn { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; padding: 0; }
+.cmt-reply-btn:hover { color: var(--accent2); }
+.cmt-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 12px; }
 .cmt-del:hover { color: var(--danger); }
 .cmt-body { color: var(--text); font-size: 14px; margin-top: 2px; word-break: break-word; white-space: pre-wrap; }
+.cmt-at { color: var(--accent2); font-weight: 600; margin-right: 2px; }
 .cmt-empty { color: var(--muted); font-size: 13px; padding: 8px 2px; text-align: center; }
+
+/* 回复（B 站 / 小黑盒 风格）：子评论缩进，浅一档底色 */
+.cmt.cmt-child { margin-left: 38px; background: var(--card); padding: 8px 10px; border-radius: 8px; }
+.cmt.cmt-child .cmt-av { width: 24px; height: 24px; }
+
+/* 行内回复输入框：紧跟在被回复评论后 */
+.cmt-reply-form { display: flex; gap: 8px; margin: 0 0 10px 38px; }
+.cmt-reply-form input {
+  flex: 1; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid #34304d; background: var(--card); color: var(--text); font-size: 13px;
+}
+.cmt-reply-form input:focus { outline: none; border-color: var(--accent); }
+.cmt-reply-form button {
+  border: none; padding: 0 14px; border-radius: 8px; cursor: pointer; font-size: 13px; flex: none;
+}
+.cmt-reply-form .cmt-reply-send { background: var(--accent); color: #fff; }
+.cmt-reply-form .cmt-reply-cancel { background: var(--card2); border: 1px solid #34304d; color: var(--text); }
 
 .comment-form { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2740; }
 .comment-form .cmt-in { flex: 1; padding: 9px 12px; border-radius: 9px; border: 1px solid #34304d; background: var(--card); color: var(--text); font-size: 14px; }

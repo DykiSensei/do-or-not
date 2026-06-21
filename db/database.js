@@ -62,4 +62,11 @@ if (!decisionCols.includes('note')) {
   db.exec('ALTER TABLE decisions ADD COLUMN note TEXT'); // 打卡留言（可纯文字打卡）
 }
 
+// 评论加 parent_id：支持「回复某条评论」。ALTER TABLE 没法补 FK，靠应用层递归删除
+const commentCols = db.prepare('PRAGMA table_info(comments)').all().map((c) => c.name);
+if (!commentCols.includes('parent_id')) {
+  db.exec('ALTER TABLE comments ADD COLUMN parent_id INTEGER');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id)');
+}
+
 module.exports = db;

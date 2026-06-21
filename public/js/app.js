@@ -218,7 +218,7 @@ async function loadFeed(reset) {
   for (const p of data.posts) {
     feedPosts.set(p.id, p);
     feed.insertAdjacentHTML('beforeend', postHtml(p));
-    maybeCollapseNote(feed.lastElementChild);
+    maybeCollapsePostBody(feed.lastElementChild);
     feedCursor = p.id; // 倒序，最后一条即最小 id
   }
   if (reset && data.posts.length === 0) {
@@ -268,11 +268,12 @@ function postHtml(p) {
   const av = avatarUrl(p.user);
   const badge = `<span class="badge ${p.result}">${p.result === 'lu' ? '撸' : '不撸'}</span>`;
   const modeTxt = p.mode === 'manual' ? '手动' : '轮盘';
-  const note = p.note
-    ? `<div class="post-note collapsible">${escapeHtml(p.note)}</div><button class="post-expand" type="button">展开</button>`
-    : '';
+  const note = p.note ? `<div class="post-note">${escapeHtml(p.note)}</div>` : '';
   const photo = p.photo
     ? `<img class="post-img" src="${escapeHtml(p.photo)}" alt="打卡照片" data-photo="${escapeHtml(p.photo)}">` : '';
+  const body = (note || photo)
+    ? `<div class="post-body collapsible">${note}${photo}</div><button class="post-expand" type="button">展开</button>`
+    : '';
   return `<div class="post-card" data-id="${p.id}">
     <div class="post-top">
       <img class="post-av" src="${av}" alt="">
@@ -281,7 +282,7 @@ function postHtml(p) {
         <div class="post-time">${fmtTime(p.created_at)} · ${modeTxt}决定</div>
       </div>
     </div>
-    ${note}${photo}
+    ${body}
     <div class="post-cmts">${commentsHtml(p.comments)}</div>
     <div class="comment-form">
       <input class="cmt-in" type="text" maxlength="500" placeholder="写条评论…" autocomplete="off">
@@ -290,28 +291,65 @@ function postHtml(p) {
   </div>`;
 }
 
-// 文字超过折叠高度才显示「展开」按钮；插入后量一次即可
-function maybeCollapseNote(card) {
-  const note = card.querySelector('.post-note.collapsible');
-  if (!note) return;
+// 文字 + 图任一超过折叠高度就显示「展开」。图片是异步加载的，load 后再量一次
+function maybeCollapsePostBody(card) {
+  const body = card.querySelector('.post-body.collapsible');
+  if (!body) return;
   const btn = card.querySelector('.post-expand');
-  if (note.scrollHeight > note.clientHeight + 1) btn.classList.add('show');
+  const check = () => {
+    if (body.classList.contains('expanded')) return;
+    if (body.scrollHeight > body.clientHeight + 1) btn.classList.add('show');
+  };
+  check();
+  const img = body.querySelector('.post-img');
+  if (img && !img.complete) img.addEventListener('load', check, { once: true });
 }
 
+// 按线程渲染：顶层评论后紧跟它的所有后代回复（扁平 + 缩进 + @ 前缀指明回复对象）
 function commentsHtml(list) {
   if (!list.length) return '';
-  return list.map((c) => {
-    const av = avatarUrl({ avatar: c.avatar, nickname: c.nickname });
-    const del = c.user_id === me.id
-      ? `<button class="cmt-del" data-id="${c.id}" title="删除">删除</button>` : '';
-    return `<div class="cmt">
-      <img class="cmt-av" src="${av}" alt="">
-      <div class="cmt-main">
-        <div class="cmt-head"><b>${escapeHtml(c.nickname)}</b><span>${fmtTime(c.created_at)}</span>${del}</div>
-        <div class="cmt-body">${escapeHtml(c.body)}</div>
-      </div>
-    </div>`;
-  }).join('');
+  const byId = new Map(list.map((c) => [c.id, c]));
+
+  const rootOf = (c) => {
+    let cur = c;
+    while (cur.parent_id && byId.has(cur.parent_id)) cur = byId.get(cur.parent_id);
+    return cur;
+  };
+
+  // 按 root 分组，组内保留原顺序（时间正序）
+  const groups = new Map();
+  for (const c of list) {
+    const rootId = rootOf(c).id;
+    if (!groups.has(rootId)) groups.set(rootId, []);
+    groups.get(rootId).push(c);
+  }
+
+  const out = [];
+  for (const [rootId, group] of groups) {
+    for (const c of group) {
+      const isReply = c.id !== rootId;
+      const parent = c.parent_id ? byId.get(c.parent_id) : null;
+      // 只有「回复了另一条回复」才标 @，回复顶层评论本身就在它下面、不需要重复
+      const at = isReply && parent && parent.id !== rootId ? parent.nickname : null;
+      out.push(commentHtml(c, isReply, at));
+    }
+  }
+  return out.join('');
+}
+
+function commentHtml(c, isReply, atName) {
+  const av = avatarUrl({ avatar: c.avatar, nickname: c.nickname });
+  const replyBtn = `<button class="cmt-reply-btn" data-id="${c.id}" data-name="${escapeHtml(c.nickname)}">回复</button>`;
+  const del = c.user_id === me.id
+    ? `<button class="cmt-del" data-id="${c.id}" title="删除">删除</button>` : '';
+  const at = atName ? `<span class="cmt-at">@${escapeHtml(atName)}</span> ` : '';
+  return `<div class="cmt${isReply ? ' cmt-child' : ''}" data-cid="${c.id}">
+    <img class="cmt-av" src="${av}" alt="">
+    <div class="cmt-main">
+      <div class="cmt-head"><b>${escapeHtml(c.nickname)}</b><span>${fmtTime(c.created_at)}</span>${replyBtn}${del}</div>
+      <div class="cmt-body">${at}${escapeHtml(c.body)}</div>
+    </div>
+  </div>`;
 }
 
 function refreshPostComments(postId) {
@@ -320,33 +358,62 @@ function refreshPostComments(postId) {
   card.querySelector('.post-cmts').innerHTML = commentsHtml(feedPosts.get(postId).comments);
 }
 
-async function addComment(postId, inputEl) {
+async function addComment(postId, inputEl, parentId) {
   const body = inputEl.value.trim();
   if (!body) return;
   inputEl.disabled = true;
   try {
-    const data = await api('/api/comments/' + postId, { method: 'POST', body: JSON.stringify({ body }) });
+    const payload = parentId ? { body, parent_id: parentId } : { body };
+    const data = await api('/api/comments/' + postId, { method: 'POST', body: JSON.stringify(payload) });
     const post = feedPosts.get(postId);
     if (post) { post.comments.push(data.comment); refreshPostComments(postId); }
     inputEl.value = '';
     await loadStats(currentDays); // 更新网格评论数角标
+    return true;
   } catch (err) {
     alert(err.message);
+    return false;
   } finally {
     inputEl.disabled = false;
-    inputEl.focus();
   }
 }
 
 async function deleteComment(postId, commentId) {
   try {
-    await api('/api/comments/' + commentId, { method: 'DELETE' });
+    const data = await api('/api/comments/' + commentId, { method: 'DELETE' });
     const post = feedPosts.get(postId);
-    if (post) { post.comments = post.comments.filter((c) => c.id !== commentId); refreshPostComments(postId); }
+    if (post) {
+      const deletedSet = new Set(data.deleted || [commentId]);
+      post.comments = post.comments.filter((c) => !deletedSet.has(c.id));
+      refreshPostComments(postId);
+    }
     await loadStats(currentDays);
   } catch (err) {
     alert(err.message);
   }
+}
+
+// 同一时刻只允许一个内联回复框：先关掉其他的，再在目标评论后插一个新的
+function openReplyForm(card, targetCmt, parentId, parentName) {
+  document.querySelectorAll('.cmt-reply-form').forEach((f) => f.remove());
+  const form = document.createElement('div');
+  form.className = 'cmt-reply-form';
+  form.dataset.parent = String(parentId);
+  form.innerHTML = `
+    <input type="text" maxlength="500" placeholder="回复 @${parentName}…" autocomplete="off">
+    <button class="cmt-reply-send" type="button">发送</button>
+    <button class="cmt-reply-cancel" type="button">取消</button>`;
+  targetCmt.insertAdjacentElement('afterend', form);
+  form.querySelector('input').focus();
+}
+
+async function submitReplyForm(form) {
+  const card = form.closest('.post-card');
+  const postId = parseInt(card.dataset.id, 10);
+  const parentId = parseInt(form.dataset.parent, 10);
+  const input = form.querySelector('input');
+  const ok = await addComment(postId, input, parentId);
+  if (ok) form.remove(); // 成功才关掉表单，失败保留让用户重试
 }
 
 // ===== 统计 =====
@@ -452,8 +519,8 @@ function bindUI() {
 
     const expand = e.target.closest('.post-expand');
     if (expand) {
-      const note = expand.previousElementSibling; // .post-note.collapsible
-      const expanded = note.classList.toggle('expanded');
+      const body = expand.previousElementSibling; // .post-body.collapsible
+      const expanded = body.classList.toggle('expanded');
       expand.textContent = expanded ? '收起' : '展开';
       return;
     }
@@ -464,14 +531,34 @@ function bindUI() {
       addComment(parseInt(card.dataset.id, 10), card.querySelector('.cmt-in'));
       return;
     }
+    const replyBtn = e.target.closest('.cmt-reply-btn');
+    if (replyBtn) {
+      const card = replyBtn.closest('.post-card');
+      const targetCmt = replyBtn.closest('.cmt');
+      openReplyForm(card, targetCmt, parseInt(replyBtn.dataset.id, 10), replyBtn.dataset.name);
+      return;
+    }
+    const replySend = e.target.closest('.cmt-reply-send');
+    if (replySend) { submitReplyForm(replySend.closest('.cmt-reply-form')); return; }
+    const replyCancel = e.target.closest('.cmt-reply-cancel');
+    if (replyCancel) { replyCancel.closest('.cmt-reply-form').remove(); return; }
+
     const del = e.target.closest('.cmt-del');
     if (del) {
       const card = del.closest('.post-card');
-      if (confirm('删除这条评论？')) deleteComment(parseInt(card.dataset.id, 10), parseInt(del.dataset.id, 10));
+      if (confirm('删除这条评论？\n（如果它有回复，回复也会一起删掉）')) {
+        deleteComment(parseInt(card.dataset.id, 10), parseInt(del.dataset.id, 10));
+      }
     }
   });
   feed.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
+    const replyInput = e.target.closest('.cmt-reply-form input');
+    if (replyInput) {
+      e.preventDefault();
+      submitReplyForm(replyInput.closest('.cmt-reply-form'));
+      return;
+    }
     const input = e.target.closest('.cmt-in');
     if (!input) return;
     e.preventDefault();

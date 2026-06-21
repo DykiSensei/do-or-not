@@ -29,7 +29,8 @@ router.get('/', requireAuth, (req, res) => {
     const ids = posts.map((p) => p.id);
     const ph = ids.map(() => '?').join(',');
     const comments = db.prepare(`
-      SELECT c.id, c.decision_id, c.body, c.created_at, c.user_id, u.nickname, u.avatar
+      SELECT c.id, c.decision_id, c.body, c.created_at, c.user_id, c.parent_id,
+             u.nickname, u.avatar
       FROM comments c JOIN users u ON u.id = c.user_id
       WHERE c.decision_id IN (${ph})
       ORDER BY c.created_at ASC, c.id ASC
@@ -37,7 +38,7 @@ router.get('/', requireAuth, (req, res) => {
     for (const c of comments) {
       if (!byPost.has(c.decision_id)) byPost.set(c.decision_id, []);
       byPost.get(c.decision_id).push({
-        id: c.id, body: c.body, created_at: c.created_at,
+        id: c.id, body: c.body, created_at: c.created_at, parent_id: c.parent_id,
         user_id: c.user_id, nickname: c.nickname, avatar: c.avatar,
       });
     }
