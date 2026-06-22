@@ -71,8 +71,11 @@ bash update.sh
 | `SMTP_USER` / `SMTP_PASS` | Gmail 地址 + 应用专用密码（16 位，不是登录密码） |
 | `MAIL_FROM_NAME` | 发件人显示名 |
 | `REMINDER_HOUR` | 各用户本地时区的几点收提醒（整数 0–23），默认 `21` |
+| `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile 密钥，用于注册接口防刷；留空则禁用验证码 |
 
 Gmail 应用专用密码：[Google 账号](https://myaccount.google.com/security) → 安全性 → 开两步验证 → 应用专用密码。用其他邮箱服务商把 `services/mailer.js` 里的 `service: 'gmail'` 换成对应 `host` / `port` / `secure` 即可。
+
+注册防刷走 [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)：免费、对正常用户基本无感（不出题）。`.env.example` 里默认填的是 Cloudflare 官方测试密钥（永远验证通过，仅供本地开发），部署前务必去 dashboard 新建一个 site 替换。
 
 地区识别走 [ip-api.com](https://ip-api.com)（免费版 45 次/分，无需 key），结果按 IP 缓存 24h；查询失败时帖子不显示地区，发帖不受影响。
 

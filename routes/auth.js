@@ -36,15 +36,51 @@ function validEmail(e) {
   return typeof e === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 }
 
+// Cloudflare Turnstile 服务端校验。未配置 secret 则跳过（本地开发可选）
+async function verifyTurnstile(token, ip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return { ok: true, skipped: true };
+  if (!token || typeof token !== 'string') return { ok: false, code: 'missing-token' };
+
+  const params = new URLSearchParams();
+  params.append('secret', secret);
+  params.append('response', token);
+  if (ip) params.append('remoteip', ip);
+
+  try {
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await resp.json();
+    return { ok: !!data.success, codes: data['error-codes'] || [] };
+  } catch (e) {
+    return { ok: false, code: 'network', error: e.message };
+  }
+}
+
+// 前端拉取 site key；未配置时返回 null，前端跳过渲染 widget
+router.get('/captcha-config', (req, res) => {
+  res.json({ siteKey: process.env.TURNSTILE_SITE_KEY || null });
+});
+
 // 注册：创建未验证用户并发验证邮件
 router.post('/register', authLimiter, async (req, res) => {
-  let { email, password, nickname } = req.body || {};
+  let { email, password, nickname, captchaToken } = req.body || {};
   email = (email || '').trim().toLowerCase();
   nickname = (nickname || '').trim();
 
   if (!validEmail(email)) return res.status(400).json({ error: '邮箱格式不正确' });
   if (!password || password.length < 6) return res.status(400).json({ error: '密码至少 6 位' });
   if (!nickname || nickname.length > 20) return res.status(400).json({ error: '昵称必填且不超过 20 字' });
+
+  const captcha = await verifyTurnstile(captchaToken, req.ip);
+  if (!captcha.ok) {
+    console.warn('[register] 人机验证未通过：', captcha.code || captcha.codes, 'ip=', req.ip);
+    return res.status(400).json({ error: '人机验证未通过，请刷新页面重试' });
+  }
 
   const exists = db.prepare('SELECT id, verified FROM users WHERE email = ?').get(email);
   if (exists) {

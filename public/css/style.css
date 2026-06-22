@@ -58,6 +58,9 @@ input:focus { outline: none; border-color: var(--accent); }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 .btn.secondary { background: var(--card2); border: 1px solid #34304d; }
 
+.cf-slot { margin-top: 16px; min-height: 65px; }
+.cf-slot:empty { min-height: 0; }
+
 .switch { text-align: center; margin-top: 18px; font-size: 14px; color: var(--muted); }
 .msg { margin-top: 14px; font-size: 14px; padding: 10px 12px; border-radius: 8px; display: none; }
 .msg.show { display: block; }

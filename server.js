@@ -21,14 +21,16 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // app.js / login.js 等走 self；Chart.js 走 jsdelivr CDN
-      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+      // app.js / login.js 等走 self；Chart.js 走 jsdelivr；Turnstile 走 challenges.cloudflare.com
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://challenges.cloudflare.com'],
       // 页面里有 style="" 内联样式，需放行内联样式（仅样式，风险低）
       styleSrc: ["'self'", "'unsafe-inline'"],
       // 默认头像是 data: SVG；二次元背景图来自 alcy.cc 图床
       // 注意：t.alcy.cc 会 302 跳到 tc.alcy.cc 等子域取图，故用通配子域放行
       imgSrc: ["'self'", 'data:', 'https://*.alcy.cc'],
       connectSrc: ["'self'"],
+      // Turnstile 验证码 widget 是个 iframe，挂在 challenges.cloudflare.com
+      frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       frameAncestors: ["'self'"],
